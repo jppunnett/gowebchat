@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Web Chat Demo (Just Echo for now)</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+    <script>
+        $(function() {
+            var ws = new WebSocket("ws://localhost:8080/echo");
+            ws.onmessage = function(e) {
+                console.log("Received:" + e.data);
+            };
+
+            var $ul = $('#msg-list');
+
+            $('#sendBtn').click(function(){
+                var data = $('#name').val();
+                ws.send(data);
+                console.log("Sent:" + data);
+                $('<li>').text(data).appendTo($ul);
+            });
+        });
+    </script>
+</head>
+<body>
+    <input id="name" type="text" />
+    <input type="button" id="sendBtn" value="send"></input>
+    <ul id="msg-list"></ul>
+</body>
+</html>
