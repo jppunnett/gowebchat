@@ -19,23 +19,12 @@ import (
 // See websocket.OriginHandler
 type ingoreOriginHandler func(*websocket.Conn)
 
-// ignoreOrigin is called during a Web Socket handshake. But, unlike the
-// default websocket behaviour, ignoreOrigin instructs the handshake
-// process to ignore the Origin request header.
-func ignoreOrigin(config *websocket.Config, req *http.Request) (error) {
-	// Extract the Origin, but since we don't care about it, ignore any errors
-	// and return nil
-	config.Origin, _ = websocket.Origin(config, req)
-	return nil
-}
-
 // ServeHTTP implements the http.Handler interface for a WebSocket but does
 // not check the origin of the request header. Useful when testing on localhost
 func (h ingoreOriginHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	s := websocket.Server{Handler: websocket.Handler(h), Handshake: ignoreOrigin}
+	s := websocket.Server{Handler: websocket.Handler(h)}
 	s.ServeHTTP(w, req)
 }
-
 
 // Echo the data received on the WebSocket.
 func EchoServer(ws *websocket.Conn) {
