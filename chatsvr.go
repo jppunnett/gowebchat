@@ -21,7 +21,7 @@ var listenAddr string = "localhost:8083"
 var chatURL string = listenAddr + "/chat"
 
 // ingoreOriginHandler is a simple interface to a WebSocket browser client.
-// It ingnores the Origin request header by default.
+// It ignores the Origin request header by default.
 // See websocket.OriginHandler
 type ingoreOriginHandler func(*websocket.Conn)
 
