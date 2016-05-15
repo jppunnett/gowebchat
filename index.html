@@ -7,24 +7,48 @@
     <script>
         $(function() {
             var ws = new WebSocket("ws://{{.}}");
+
             ws.onmessage = function(e) {
-                console.log("Received:" + e.data);
+                appendMsg(e.data);
+                // Clear the text in the to-send field
+                $('#to-send').val("");
             };
 
-            var $ul = $('#msg-list');
 
-            $('#sendBtn').click(function(){
-                var data = $('#name').val();
+            $('#send-btn').click(function(){
+                var data = $('#to-send').val();
                 ws.send(data);
-                console.log("Sent:" + data);
-                $('<li>').text(data).appendTo($ul);
+                appendMsg(data);
             });
         });
-    </script>
+
+        $(document).ready(function(){
+            $('#to-send').keypress(function(e){
+                if(e.keyCode==13)
+                    $('#send-btn').click();
+            });
+        });
+
+        function appendMsg(msg) {
+            var msgs = $('#msg-list').val();
+            msgs += msg + "\n";
+            $('#msg-list').val(msgs)
+            
+            // scroll to end of text area to we can always see the last
+            // message sent/received
+            $("#msg-list").animate({
+                scrollTop:$("#msg-list")[0].scrollHeight - $("#msg-list").height()
+            });
+
+        }
+</script>
+
 </head>
 <body>
-    <input id="name" type="text" />
-    <input type="button" id="sendBtn" value="send"></input>
-    <ul id="msg-list"></ul>
+    <input id="to-send" type="text" />
+    <input type="button" id="send-btn" value="send"></input>
+    <p>
+        <textarea id="msg-list" rows="10" cols="50"></textarea> 
+    </p>
 </body>
 </html>
