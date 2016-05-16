@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <title>Web Chat Demo (Just Echo for now)</title>
+    <title>Web Chat</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
     <script>
         $(function() {
@@ -10,15 +10,15 @@
 
             ws.onmessage = function(e) {
                 appendMsg(e.data);
-                // Clear the text in the to-send field
-                $('#to-send').val("");
             };
 
 
             $('#send-btn').click(function(){
                 var data = $('#to-send').val();
-                ws.send(data);
+                ws.send(data + "\n");
                 appendMsg(data);
+                // Clear the text in the to-send field
+                $('#to-send').val("");
             });
         });
 
@@ -39,7 +39,6 @@
             $("#msg-list").animate({
                 scrollTop:$("#msg-list")[0].scrollHeight - $("#msg-list").height()
             });
-
         }
 </script>
 
