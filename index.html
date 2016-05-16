@@ -16,7 +16,7 @@
             $('#send-btn').click(function(){
                 var data = $('#to-send').val();
                 ws.send(data + "\n");
-                appendMsg(data);
+                // appendMsg(data);
                 // Clear the text in the to-send field
                 $('#to-send').val("");
             });
