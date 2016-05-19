@@ -21,7 +21,10 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-type client chan<- string // an outgoing message channel
+type client struct {
+	name  string
+	msgch chan string
+}
 
 var (
 	// Host and port on which to listen for incoming HTTP requests
@@ -29,8 +32,8 @@ var (
 	// Websocket URL. Default is same as listen address
 	chatURL = listenAddr + "/chat"
 
-	entering = make(chan client)
-	leaving  = make(chan client)
+	entering = make(chan *client)
+	leaving  = make(chan *client)
 	messages = make(chan string) // all incoming client messages
 )
 
@@ -48,13 +51,13 @@ func (h ingoreOriginHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 
 // Start a chat.
 func chatHandler(wsc *websocket.Conn) {
-	ch := make(chan string) // outgoing client messages
-	go clientWriter(wsc, ch)
+	clip := &client{getChattersName(wsc), make(chan string)}
+	// ch := make(chan string) // outgoing client messages
+	go clientWriter(wsc, clip)
 
-	who := getChattersName(wsc)
-	ch <- "You are " + who
-	messages <- who + " has arrived"
-	entering <- ch
+	clip.msgch <- "You are " + clip.name
+	messages <- clip.name + " has arrived"
+	entering <- clip
 
 	input := bufio.NewScanner(wsc)
 	for input.Scan() {
@@ -62,17 +65,17 @@ func chatHandler(wsc *websocket.Conn) {
 		says := input.Text()
 		fmt.Printf(" says = %v\n", says)
 
-		messages <- who + ": " + says
+		messages <- clip.name + ": " + says
 	}
 	// NOTE: ignoring potential errors from input.Err()
 
-	leaving <- ch
-	messages <- who + " has left"
+	leaving <- clip
+	messages <- clip.name + " has left"
 	wsc.Close()
 }
 
-func clientWriter(conn net.Conn, ch <-chan string) {
-	for msg := range ch {
+func clientWriter(conn net.Conn, clip *client) {
+	for msg := range clip.msgch {
 		n, err := fmt.Fprint(conn, msg)
 		fmt.Printf("bytes written = %d, err = %v\n", n, err)
 	}
@@ -97,22 +100,26 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func broadcaster() {
-	clients := make(map[client]bool) // all connected clients
+	clients := make(map[*client]bool) // all connected clients
 	for {
 		select {
 		case msg := <-messages:
 			// Broadcast incoming message to all
 			// clients' outgoing message channels.
 			for cli := range clients {
-				cli <- msg
+				cli.msgch <- msg
 			}
 
 		case cli := <-entering:
+			// Tell cli who else is in the chat
+			for c := range clients {
+				cli.msgch <- c.name + " is here."
+			}
 			clients[cli] = true
 
 		case cli := <-leaving:
 			delete(clients, cli)
-			close(cli)
+			close(cli.msgch)
 		}
 	}
 }
