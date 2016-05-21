@@ -7,8 +7,8 @@ package main
 // If [host:port] is not specified, then chatsvr defaults to localhost:8083
 // If [chat URL] is not specified, then chat server defaults to host:port/chat
 //
-// The approach was lifted (almost verbatim)from chapter 8 of The Go Programming
-// Language.
+// The approach was lifted (almost verbatim) from chapter 8 of "The Go
+// Programming Language".
 
 import (
 	"bufio"
@@ -17,18 +17,22 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/net/websocket"
 )
 
+// client represents a client
 type client struct {
-	name  string
-	msgch chan string
+	name    string
+	msgch   chan string // Send messages to the client
+	inputch chan string // Receive messages from the client
 }
 
 var (
 	// Host and port on which to listen for incoming HTTP requests
 	listenAddr = "localhost:8083"
+
 	// Websocket URL. Default is same as listen address
 	chatURL = listenAddr + "/chat"
 
@@ -51,38 +55,51 @@ func (h ingoreOriginHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 
 // Start a chat.
 func chatHandler(wsc *websocket.Conn) {
-	clip := &client{getChattersName(wsc), make(chan string)}
-	// ch := make(chan string) // outgoing client messages
-	go clientWriter(wsc, clip)
+	cli := client{getChattersName(wsc), make(chan string), make(chan string)}
+	go clientWriter(wsc, &cli)
 
-	clip.msgch <- "You are " + clip.name
-	messages <- clip.name + " has arrived"
-	entering <- clip
+	cli.msgch <- "You are " + cli.name
+	messages <- cli.name + " has arrived"
+	entering <- &cli
 
-	input := bufio.NewScanner(wsc)
-	for input.Scan() {
-		fmt.Printf("err = %v", input.Err())
-		says := input.Text()
-		fmt.Printf(" says = %v\n", says)
+	go clientReader(wsc, &cli)
 
-		messages <- clip.name + ": " + says
+	chatting := true
+	for chatting {
+		select {
+		case input := <-cli.inputch:
+			messages <- cli.name + ": " + input
+
+		case <-time.After(time.Minute * 5):
+			// Tell client that they have timed out. We need to sleep for a bit
+			// to let the message arrive.
+			cli.msgch <- "Timed out"
+			time.Sleep(time.Second * 1)
+
+			chatting = false
+		}
 	}
-	// NOTE: ignoring potential errors from input.Err()
 
-	leaving <- clip
-	messages <- clip.name + " has left"
+	leaving <- &cli
+	messages <- cli.name + " has left"
 	wsc.Close()
+}
+
+func clientReader(conn net.Conn, clip *client) {
+	input := bufio.NewScanner(conn)
+	for input.Scan() {
+		clip.inputch <- input.Text()
+	}
 }
 
 func clientWriter(conn net.Conn, clip *client) {
 	for msg := range clip.msgch {
-		n, err := fmt.Fprint(conn, msg)
-		fmt.Printf("bytes written = %d, err = %v\n", n, err)
+		fmt.Fprint(conn, msg)
 	}
 }
 
 func getChattersName(wsc *websocket.Conn) string {
-	// TODO: Let client send their name
+	// TODO: Let client enter their name
 	return wsc.Request().RemoteAddr
 }
 
@@ -104,14 +121,14 @@ func broadcaster() {
 	for {
 		select {
 		case msg := <-messages:
-			// Broadcast incoming message to all
-			// clients' outgoing message channels.
+			// Broadcast incoming message to all clients' outgoing message
+			// channels.
 			for cli := range clients {
 				cli.msgch <- msg
 			}
 
 		case cli := <-entering:
-			// Tell cli who else is in the chat
+			// Tell arriving client who else is here
 			for c := range clients {
 				cli.msgch <- c.name + " is here."
 			}
