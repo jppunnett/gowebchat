@@ -71,8 +71,8 @@ func chatHandler(wsc *websocket.Conn) {
 			messages <- cli.name + ": " + input
 
 		case <-time.After(time.Minute * 5):
-			// Tell client that they have timed out. We need to sleep for a bit
-			// to let the message arrive.
+			// Tell client that they have timed out. We need to sleep to give
+			// the message time to reach the client before we close the scoket.
 			cli.msgch <- "Timed out"
 			time.Sleep(time.Second * 1)
 
