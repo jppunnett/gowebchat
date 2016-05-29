@@ -14,6 +14,7 @@ import (
 	"bufio"
 	"fmt"
 	"html/template"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -55,7 +56,7 @@ func (h ingoreOriginHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 
 // Start a chat.
 func chatHandler(wsc *websocket.Conn) {
-	cli := client{getChattersName(wsc), make(chan string), make(chan string)}
+	cli := client{getClientName(wsc), make(chan string), make(chan string)}
 	go clientWriter(wsc, &cli)
 
 	cli.msgch <- "You are " + cli.name
@@ -70,7 +71,7 @@ func chatHandler(wsc *websocket.Conn) {
 		case input := <-cli.inputch:
 			messages <- cli.name + ": " + input
 
-		case <-time.After(time.Minute * 5):
+		case <-time.After(time.Minute * 1):
 			// Tell client that they have timed out. We need to sleep to give
 			// the message time to reach the client before we close the scoket.
 			cli.msgch <- "Timed out"
@@ -88,6 +89,7 @@ func chatHandler(wsc *websocket.Conn) {
 func clientReader(conn net.Conn, clip *client) {
 	input := bufio.NewScanner(conn)
 	for input.Scan() {
+		log.Println("input.Err():", input.Err())
 		clip.inputch <- input.Text()
 	}
 }
@@ -98,9 +100,20 @@ func clientWriter(conn net.Conn, clip *client) {
 	}
 }
 
-func getChattersName(wsc *websocket.Conn) string {
-	// TODO: Let client enter their name
-	return wsc.Request().RemoteAddr
+// Allow the client to set their name
+func getClientName(wsc *websocket.Conn) string {
+
+	// Assume that first word is client's name
+	input := bufio.NewScanner(wsc)
+	input.Split(bufio.ScanWords)
+	input.Scan()
+	if err := input.Err(); err != nil {
+		log.Println(os.Stderr, "getting client name:", err)
+
+		// Default name to ip:port
+		return wsc.Request().RemoteAddr
+	}
+	return input.Text()
 }
 
 func rootHandler(w http.ResponseWriter, req *http.Request) {
@@ -135,7 +148,16 @@ func broadcaster() {
 			clients[cli] = true
 
 		case cli := <-leaving:
+			log.Printf("%v is leaving.\n", cli)
+
+			connected, ok := clients[cli]
+			log.Printf("Before delete: connected = %v, ok = %v\n", connected, ok)
+
 			delete(clients, cli)
+
+			connected, ok = clients[cli]
+			log.Printf("After delete: connected = %v, ok = %v\n", connected, ok)
+
 			close(cli.msgch)
 		}
 	}

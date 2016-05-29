@@ -5,36 +5,52 @@
     <title>Web Chat</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
     <script>
+        
         $(function() {
-            var ws = new WebSocket("ws://{{.}}");
 
-            ws.onmessage = function(e) {
-                appendMsg(e.data);
-            };
-
-
-            $('#send-btn').click(function(){
-                var data = $('#to-send').val();
-                ws.send(data + "\n");
-                // appendMsg(data);
-                // Clear the text in the to-send field
-                $('#to-send').val("");
-            });
-        });
-
-        $(document).ready(function(){
-            $('#to-send').keypress(function(e){
+            $('#msg').keypress(function(e) {
                 if(e.keyCode==13)
                     $('#send-btn').click();
             });
+
+            $('#connect-btn').click(function() {
+                // Set up the Web Socket (global--I know, bad form)
+                ws = new WebSocket("ws://{{.}}");
+                
+                ws.onmessage = function(e) {
+                    appendMsg(e.data);
+                    console.log(e.data);
+                };
+
+                ws.onopen = function(e) {
+                    // Send client's name
+                    ws.send($('#name').val() + "\n");
+                }
+
+                window.onbeforeunload = function(e) {
+                    if (ws) {
+                        console.log("Closing websocket");
+                        ws.close();
+                    }
+                }
+            });
+
+            $('#send-btn').click(function(){
+                var msg = $('#msg').val();
+                ws.send(msg + "\n");
+                // Clear the text in the msg field
+                $('#msg').val("");
+            });
         });
 
+        // Appends msg to end of message list, scrolling to the bottom if
+        // necessary.
         function appendMsg(msg) {
             var msgs = $('#msg-list').val();
             msgs += msg + "\n";
-            $('#msg-list').val(msgs)
+            $('#msg-list').val(msgs);
             
-            // scroll to end of text area to we can always see the last
+            // scroll to end of text area so we can always see the last
             // message sent/received
             $("#msg-list").animate({
                 scrollTop:$("#msg-list")[0].scrollHeight - $("#msg-list").height()
@@ -44,10 +60,18 @@
 
 </head>
 <body>
-    <input id="to-send" type="text" />
-    <input type="button" id="send-btn" value="send"></input>
-    <p>
-        <textarea id="msg-list" rows="10" cols="50"></textarea> 
-    </p>
+    <div>
+        <input id="name" type="text" />
+        <input type="button" id="connect-btn" value="connect"></input>
+    </div>
+    
+    <div id="chat-area">
+        <input id="msg" type="text" />
+        <input type="button" id="send-btn" value="send"></input>
+        <p>
+            <textarea id="msg-list" rows="10" cols="50"></textarea> 
+        </p>
+    </div>
+
 </body>
 </html>
