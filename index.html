@@ -27,6 +27,11 @@
                     ws.send($('#name').val() + "\n");
                 }
 
+                ws.onclose = function(e) {
+                    console.log(e.code);
+                    appendMsg("Server end of connection closed/timed out.")
+                }
+
                 window.onbeforeunload = function(e) {
                     if (ws) {
                         console.log("Closing websocket");

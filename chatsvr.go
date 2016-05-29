@@ -27,7 +27,6 @@ import (
 type client struct {
 	name    string
 	msgch   chan string // Send messages to the client
-	inputch chan string // Receive messages from the client
 }
 
 var (
@@ -56,42 +55,27 @@ func (h ingoreOriginHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 
 // Start a chat.
 func chatHandler(wsc *websocket.Conn) {
-	cli := client{getClientName(wsc), make(chan string), make(chan string)}
+	cli := client{getClientName(wsc), make(chan string)}
 	go clientWriter(wsc, &cli)
 
 	cli.msgch <- "You are " + cli.name
 	messages <- cli.name + " has arrived"
 	entering <- &cli
 
-	go clientReader(wsc, &cli)
-
-	chatting := true
-	for chatting {
-		select {
-		case input := <-cli.inputch:
-			messages <- cli.name + ": " + input
-
-		case <-time.After(time.Minute * 1):
-			// Tell client that they have timed out. We need to sleep to give
-			// the message time to reach the client before we close the scoket.
-			cli.msgch <- "Timed out"
-			time.Sleep(time.Second * 1)
-
-			chatting = false
+	input := bufio.NewScanner(wsc)
+	wsc.SetReadDeadline(time.Now().Add(time.Second*30))
+	for input.Scan() {
+		if err := input.Err(); err != nil {
+			log.Println("input.Err():", input.Err())
+			break
 		}
+		wsc.SetReadDeadline(time.Now().Add(time.Second*30))
+		messages <- cli.name + ": " + input.Text()
 	}
 
 	leaving <- &cli
 	messages <- cli.name + " has left"
 	wsc.Close()
-}
-
-func clientReader(conn net.Conn, clip *client) {
-	input := bufio.NewScanner(conn)
-	for input.Scan() {
-		log.Println("input.Err():", input.Err())
-		clip.inputch <- input.Text()
-	}
 }
 
 func clientWriter(conn net.Conn, clip *client) {
@@ -148,16 +132,8 @@ func broadcaster() {
 			clients[cli] = true
 
 		case cli := <-leaving:
-			log.Printf("%v is leaving.\n", cli)
-
-			connected, ok := clients[cli]
-			log.Printf("Before delete: connected = %v, ok = %v\n", connected, ok)
-
+			log.Printf("%v is leaving.\n", cli.name)
 			delete(clients, cli)
-
-			connected, ok = clients[cli]
-			log.Printf("After delete: connected = %v, ok = %v\n", connected, ok)
-
 			close(cli.msgch)
 		}
 	}
