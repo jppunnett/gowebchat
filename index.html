@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <title>Web Chat</title>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
     <script>
         
         $(function() {
@@ -11,6 +11,11 @@
             $('#msg').keypress(function(e) {
                 if(e.keyCode==13)
                     $('#send-btn').click();
+            });
+
+            $('#name').keypress(function(e) {
+                if(e.keyCode==13)
+                    $('#connect-btn').click();
             });
 
             $('#connect-btn').click(function() {
@@ -25,11 +30,14 @@
                 ws.onopen = function(e) {
                     // Send client's name
                     ws.send($('#name').val() + "\n");
+                    $('#connect-btn').prop('disabled', true);
+                    $('#msg').focus();
                 }
 
                 ws.onclose = function(e) {
                     console.log(e.code);
                     appendMsg("Server end of connection closed/timed out.")
+                    $('#connect-btn').prop('disabled', false);
                 }
 
                 window.onbeforeunload = function(e) {
@@ -65,17 +73,17 @@
 
 </head>
 <body>
-    <div>
-        <input id="name" type="text" />
+    <div id="connect-area">
+        <label for="name">Name</label>
+        <input id="name" type="text" autofocus />
         <input type="button" id="connect-btn" value="connect"></input>
     </div>
-    
+    <br/>
     <div id="chat-area">
+        <textarea id="msg-list" rows="15" cols="50"></textarea>
+        <br/>
         <input id="msg" type="text" />
         <input type="button" id="send-btn" value="send"></input>
-        <p>
-            <textarea id="msg-list" rows="10" cols="50"></textarea> 
-        </p>
     </div>
 
 </body>

@@ -63,13 +63,13 @@ func chatHandler(wsc *websocket.Conn) {
 	entering <- &cli
 
 	input := bufio.NewScanner(wsc)
-	wsc.SetReadDeadline(time.Now().Add(time.Second*30))
+	wsc.SetReadDeadline(time.Now().Add(time.Minute*30))
 	for input.Scan() {
 		if err := input.Err(); err != nil {
 			log.Println("input.Err():", input.Err())
 			break
 		}
-		wsc.SetReadDeadline(time.Now().Add(time.Second*30))
+		wsc.SetReadDeadline(time.Now().Add(time.Minute*30))
 		messages <- cli.name + ": " + input.Text()
 	}
 
