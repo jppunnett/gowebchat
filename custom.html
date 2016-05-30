@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Web Chat (Custom)</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
+    <script>
+        
+        $(function() {
+
+            $('#msg').keypress(function(e) {
+                if(e.keyCode==13)
+                    $('#send-btn').click();
+            });
+
+            $('#name').keypress(function(e) {
+                if(e.keyCode==13)
+                    $('#connect-btn').click();
+            });
+
+            $('#connect-btn').click(function() {
+                // Set up the Web Socket (global--I know, bad form)
+                ws = new WebSocket("ws://192.168.10.106:8083/chat");
+                
+                ws.onmessage = function(e) {
+                    appendMsg(e.data);
+                    console.log(e.data);
+                };
+
+                ws.onopen = function(e) {
+                    // Send client's name
+                    ws.send($('#name').val() + "\n");
+                    $('#connect-btn').prop('disabled', true);
+                    $('#msg').focus();
+                }
+
+                ws.onclose = function(e) {
+                    console.log(e.code);
+                    appendMsg("Server end of connection closed/timed out.")
+                    $('#connect-btn').prop('disabled', false);
+                }
+
+                window.onbeforeunload = function(e) {
+                    if (ws) {
+                        console.log("Closing websocket");
+                        ws.close();
+                    }
+                }
+            });
+
+            $('#send-btn').click(function(){
+                var msg = $('#msg').val();
+                ws.send(msg + "\n");
+                // Clear the text in the msg field
+                $('#msg').val("");
+            });
+        });
+
+        // Appends msg to end of message list, scrolling to the bottom if
+        // necessary.
+        function appendMsg(msg) {
+            var msgs = $('#msg-list').val();
+            msgs += msg + "\n";
+            $('#msg-list').val(msgs);
+            
+            // scroll to end of text area so we can always see the last
+            // message sent/received
+            $("#msg-list").animate({
+                scrollTop:$("#msg-list")[0].scrollHeight - $("#msg-list").height()
+            });
+        }
+</script>
+
+</head>
+<body>
+    <div id="connect-area">
+        <label for="name">Name</label>
+        <input id="name" type="text" autofocus />
+        <input type="button" id="connect-btn" value="connect"></input>
+    </div>
+    <br/>
+    <div id="chat-area">
+        <textarea id="msg-list" rows="15" cols="50"></textarea>
+        <br/>
+        <input id="msg" type="text" />
+        <input type="button" id="send-btn" value="send"></input>
+    </div>
+
+</body>
+</html>
