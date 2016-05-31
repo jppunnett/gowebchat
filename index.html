@@ -29,7 +29,12 @@
 
                 ws.onopen = function(e) {
                     // Send client's name
-                    ws.send($('#name').val() + "\n");
+                    var cliname = $('#name').val();
+                    if (cliname.length == 0) {
+                        cliname = "----";
+                    }
+                    ws.send(cliname + "\n");
+
                     $('#connect-btn').prop('disabled', true);
                     $('#msg').focus();
                 }

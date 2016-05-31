@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -25,8 +26,8 @@ import (
 
 // client represents a client
 type client struct {
-	name    string
-	msgch   chan string // Send messages to the client
+	name  string
+	msgch chan string // Send messages to the client
 }
 
 var (
@@ -55,7 +56,8 @@ func (h ingoreOriginHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 
 // Start a chat.
 func chatHandler(wsc *websocket.Conn) {
-	cli := client{getClientName(wsc), make(chan string)}
+	cliName := getClientName(wsc)
+	cli := client{cliName, make(chan string)}
 	go clientWriter(wsc, &cli)
 
 	cli.msgch <- "You are " + cli.name
@@ -63,13 +65,13 @@ func chatHandler(wsc *websocket.Conn) {
 	entering <- &cli
 
 	input := bufio.NewScanner(wsc)
-	wsc.SetReadDeadline(time.Now().Add(time.Minute*30))
+	wsc.SetReadDeadline(time.Now().Add(time.Minute * 30))
 	for input.Scan() {
 		if err := input.Err(); err != nil {
 			log.Println("input.Err():", input.Err())
 			break
 		}
-		wsc.SetReadDeadline(time.Now().Add(time.Minute*30))
+		wsc.SetReadDeadline(time.Now().Add(time.Minute * 30))
 		messages <- cli.name + ": " + input.Text()
 	}
 
@@ -86,18 +88,24 @@ func clientWriter(conn net.Conn, clip *client) {
 
 // Allow the client to set their name
 func getClientName(wsc *websocket.Conn) string {
+	defaultName := wsc.Request().RemoteAddr
 
 	// Assume that first word is client's name
 	input := bufio.NewScanner(wsc)
 	input.Split(bufio.ScanWords)
 	input.Scan()
 	if err := input.Err(); err != nil {
-		log.Println(os.Stderr, "getting client name:", err)
+		log.Println("Error getting client name:", err)
 
 		// Default name to ip:port
-		return wsc.Request().RemoteAddr
+		return defaultName
 	}
-	return input.Text()
+
+	name := input.Text()
+	if strings.Trim(name, "-") == "" {
+		name = defaultName
+	}
+	return name
 }
 
 func rootHandler(w http.ResponseWriter, req *http.Request) {
